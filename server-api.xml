@@ -1,0 +1,58 @@
+<RestClientRequest>
+  <option name="biscuits">
+    <list />
+  </option>
+  <option name="httpMethod" value="POST" />
+  <option name="urlBase" value="http://localhost:8085" />
+  <option name="urlPath" value="/api/message/send" />
+  <option name="headers">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="Accept" />
+        <option name="value" value="*/*" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Connection" />
+        <option name="value" value="keep-alive" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Content-Type" />
+        <option name="value" value="application/x-www-form-urlencoded; charset=UTF-8" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="X-Requested-With" />
+        <option name="value" value="XMLHttpRequest" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parameters">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="content" />
+        <option name="value" value="TEST" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="action" />
+        <option name="value" value="2" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="sender" />
+        <option name="value" value="JAVA客户端" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="receiver" />
+        <option name="value" value="9999" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="format" />
+        <option name="value" value="0" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parametersEnabled" value="true" />
+  <option name="haveTextToSend" value="false" />
+  <option name="haveFileToSend" value="false" />
+  <option name="isFileUpload" value="false" />
+  <option name="textToSend" value="{&quot;action&quot;:&quot;2&quot;,&quot;content&quot;:&quot;00000000000000000&quot;,&quot;extra&quot;:&quot;null&quot;,&quot;sender&quot;:&quot;JAVA客户端&quot;,&quot;receiver&quot;:&quot;system&quot;,&quot;format&quot;:&quot;0&quot;,&quot;timestamp&quot;:1576657987689}" />
+  <option name="filesToSend" value="" />
+</RestClientRequest>

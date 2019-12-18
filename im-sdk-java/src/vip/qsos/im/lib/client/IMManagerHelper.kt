@@ -2,6 +2,7 @@ package vip.qsos.im.lib.client
 
 import vip.qsos.im.lib.client.constant.IMConstant
 import vip.qsos.im.lib.client.model.Intent
+import vip.qsos.im.lib.client.model.Message
 import vip.qsos.im.lib.client.model.SendBody
 import java.util.*
 
@@ -159,19 +160,50 @@ object IMManagerHelper {
     private fun sendBindRequest(account: String) {
         IMCacheManager.instance.putBoolean(IMCacheManager.KEY_MANUAL_STOP, false)
         val sendBody = SendBody()
-        val sysPro = System.getProperties()
         sendBody.key = IMConstant.RequestKey.CLIENT_BIND
         sendBody.put("account", account)
         sendBody.put("deviceId", deviceId)
         sendBody.put("channel", "java")
-        sendBody.put("device", sysPro.getProperty("os.name"))
+        sendBody.put("device", device)
         sendBody.put("version", clientVersion)
-        sendBody.put("osVersion", sysPro.getProperty("os.version"))
+        sendBody.put("osVersion", version)
         sendRequest(sendBody)
     }
 
+    /**创建一个本客户端发送消息实体*/
+    fun createMessageOfMe(content: String, receiver: String): Message {
+        val message = Message()
+        message.action = "2"
+        message.content = content
+        message.sender = account
+        message.receiver = receiver
+        message.format = "0"
+        return message
+    }
+
+    /**获取设备版本*/
+    val version: String
+        get() {
+            var version = System.getProperties().getProperty("os.version")
+            if (version == null) {
+                version = ""
+            }
+            return version
+        }
+
+    /**获取设备名称*/
+    val device: String
+        get() {
+            var name = System.getProperties().getProperty("os.name")
+            if (name == null) {
+                name = UUID.randomUUID().toString().replace("-".toRegex(), "").toUpperCase()
+                System.getProperties()[IMConstant.ConfigKey.CLIENT_DEVICE_ID] = deviceId
+            }
+            return name
+        }
+
     /**生成设备唯一ID*/
-    private val deviceId: String
+    val deviceId: String
         get() {
             var deviceId = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_DEVICE_ID)
             if (deviceId == null) {
