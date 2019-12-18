@@ -1,241 +1,183 @@
+package vip.qsos.im.lib.client
 
-package com.farsunset.cim.sdk.client;
-
-import java.util.Properties;
-import java.util.UUID;
-
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
-import com.farsunset.cim.sdk.client.model.Intent;
-import com.farsunset.cim.sdk.client.model.SentBody;
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.client.model.Intent
+import vip.qsos.im.lib.client.model.SendBody
+import java.util.*
 
 /**
- * CIM 功能接口
+ * @author : 华清松
+ * 消息服务管理帮助类
  */
-public class CIMPushManager {
+object IMManagerHelper {
+    /**【动作】发送消息到服务器*/
+    const val ACTION_SEND_REQUEST_BODY = "ACTION_SEND_REQUEST_BODY"
+    /**【动作】关闭服务器连接*/
+    const val ACTION_CLOSE_CONNECTION = "ACTION_CLOSE_CONNECTION"
+    /**【动作】销毁服务器连接*/
+    const val ACTION_DESTROY_CONNECTION = "ACTION_DESTROY_CONNECTION"
+    /**【动作】连接消息服务器*/
+    const val ACTION_CREATE_CONNECTION = "ACTION_CREATE_CONNECTION"
+    /**【动作】消息服务器活跃检测，死掉将重连*/
+    const val ACTION_ACTIVATE_PUSH_SERVICE = "ACTION_ACTIVATE_PUSH_SERVICE"
+    /**发送的消息数据*/
+    const val KEY_SEND_BODY = "KEY_SEND_BODY"
+    /**连接状态*/
+    const val KEY_CONNECTION_STATUS = "KEY_CONNECTION_STATUS"
 
-	static String ACTION_ACTIVATE_PUSH_SERVICE = "ACTION_ACTIVATE_PUSH_SERVICE";
+    /**服务连接状态*/
+    enum class STATE {
+        NORMAL,
+        STOP,
+        DESTROY;
+    }
 
-	static String ACTION_CREATE_CIM_CONNECTION = "ACTION_CREATE_CIM_CONNECTION";
+    /**连接服务端，在程序启动页或者 在Application里调用*/
+    fun connect(host: String?, port: Int) {
+        if (host == null || host.trim().isEmpty()) {
+            return
+        }
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_IM_DESTROY, false)
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_MANUAL_STOP, false)
+        IMCacheManager.instance.putString(IMCacheManager.KEY_IM_SERVER_HOST, host)
+        IMCacheManager.instance.putInt(IMCacheManager.KEY_IM_SERVER_PORT, port)
+        val serviceIntent = Intent()
+        serviceIntent.putExtra(IMCacheManager.KEY_IM_SERVER_HOST, host)
+        serviceIntent.putExtra(IMCacheManager.KEY_IM_SERVER_PORT, port)
+        serviceIntent.action = this.ACTION_CREATE_CONNECTION
+        postEvent(serviceIntent)
+    }
 
-	static String ACTION_SEND_REQUEST_BODY = "ACTION_SEND_REQUEST_BODY";
+    /**连接服务器，从缓存中获取host和port*/
+    fun connect() {
+        val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualStop || manualDestroy) {
+            return
+        }
+        val host: String? = IMCacheManager.instance.getString(IMCacheManager.KEY_IM_SERVER_HOST)
+        val port: Int = IMCacheManager.instance.getInt(IMCacheManager.KEY_IM_SERVER_PORT)
+        connect(host, port)
+    }
 
-	static String ACTION_CLOSE_CIM_CONNECTION = "ACTION_CLOSE_CIM_CONNECTION";
+    /**账号登录*/
+    fun bindAccount(account: String?) {
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualDestroy || account == null || account.trim().isEmpty()) {
+            return
+        }
+        sendBindRequest(account)
+    }
 
-	static String ACTION_DESTORY = "ACTION_DESTORY";
+    /**账号自动登录*/
+    fun autoBindDeviceId(): Boolean {
+        val account: String? = account
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
+        if (manualStop || account == null || account.trim().isEmpty() || manualDestroy) {
+            return false
+        }
+        sendBindRequest(account)
+        return true
+    }
 
-	static String KEY_CIM_CONNECTION_STATUS = "KEY_CIM_CONNECTION_STATUS";
+    /**发送消息*/
+    fun sendRequest(body: SendBody?) {
+        val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualStop || manualDestroy) {
+            return
+        }
+        val serviceIntent = Intent()
+        serviceIntent.putExtra(SendBody::class.java.name, body)
+        serviceIntent.action = ACTION_SEND_REQUEST_BODY
+        postEvent(serviceIntent)
+    }
 
-	// 被销毁的destroy()
-	public static final int STATE_DESTROYED = 0x0000DE;
-	// 被销停止的 stop()
-	public static final int STATE_STOPED = 0x0000EE;
+    /**停止服务，退出当前账号登录，断开连接，可重连*/
+    fun stop() {
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualDestroy) {
+            return
+        }
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_MANUAL_STOP, true)
+        postEvent(Intent(this.ACTION_CLOSE_CONNECTION))
+    }
 
-	public static final int STATE_NORMAL = 0x000000;
+    /**完全销毁，一般用于完全退出程序，调用resume将不能恢复*/
+    fun destroy() {
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_IM_DESTROY, true)
+        val serviceIntent = Intent()
+        serviceIntent.action = this.ACTION_DESTROY_CONNECTION
+        postEvent(serviceIntent)
+    }
 
-	/**
-	 * 初始化,连接服务端，在程序启动页或者 在Application里调用
-	 * 
-	 * @param context
-	 * @param ip
-	 * @param port
-	 */
+    /**重新恢复接收推送，重新连接服务端并登录当前账号*/
+    fun resume() {
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualDestroy) {
+            return
+        }
+        autoBindDeviceId()
+    }
 
-	public static void connect(String ip, int port) {
+    /**是否已连接*/
+    val isConnected: Boolean
+        get() = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_CONNECTION_STATE)
 
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_CIM_DESTROYED, false);
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_MANUAL_STOP, false);
+    /**连接状态*/
+    val state: STATE
+        get() {
+            val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+            val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
+            if (manualDestroy) {
+                return STATE.DESTROY
+            }
+            return if (manualStop) STATE.STOP else STATE.NORMAL
+        }
 
-		CIMCacheManager.getInstance().putString(CIMCacheManager.KEY_CIM_SERVIER_HOST, ip);
-		CIMCacheManager.getInstance().putInt(CIMCacheManager.KEY_CIM_SERVIER_PORT, port);
+    /**连接版本*/
+    var clientVersion: String
+        get() = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_VERSION)
+        set(version) {
+            System.getProperties()[IMConstant.ConfigKey.CLIENT_VERSION] = version
+        }
 
-		Intent serviceIntent = new Intent();
-		serviceIntent.putExtra(CIMCacheManager.KEY_CIM_SERVIER_HOST, ip);
-		serviceIntent.putExtra(CIMCacheManager.KEY_CIM_SERVIER_PORT, port);
-		serviceIntent.setAction(ACTION_CREATE_CIM_CONNECTION);
-		startService(serviceIntent);
+    /**登录账号*/
+    var account: String
+        get() = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_ACCOUNT)
+        set(account) {
+            System.getProperties()[IMConstant.ConfigKey.CLIENT_ACCOUNT] = account
+        }
 
-	}
+    /**发布事件*/
+    private fun postEvent(intent: Intent) {
+        IMPushService.instance.onStartCommand(intent)
+    }
 
-	private static void startService(Intent intent) {
-		CIMPushService.getInstance().onStartCommand(intent);
-	}
+    /**账号登录*/
+    private fun sendBindRequest(account: String) {
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_MANUAL_STOP, false)
+        val sent = SendBody()
+        val sysPro = System.getProperties()
+        sent.key = IMConstant.RequestKey.CLIENT_BIND
+        sent.put("account", account)
+        sent.put("deviceId", deviceId)
+        sent.put("channel", "java")
+        sent.put("device", sysPro.getProperty("os.name"))
+        sent.put("version", clientVersion)
+        sent.put("osVersion", sysPro.getProperty("os.version"))
+        sendRequest(sent)
+    }
 
-	protected static void connect() {
-
-		boolean isManualStop = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_MANUAL_STOP);
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-
-		if (isManualStop || isManualDestory) {
-			return;
-		}
-
-		String host = CIMCacheManager.getInstance().getString(CIMCacheManager.KEY_CIM_SERVIER_HOST);
-		int port = CIMCacheManager.getInstance().getInt(CIMCacheManager.KEY_CIM_SERVIER_PORT);
-
-		connect(host, port);
-
-	}
-
-	private static void sendBindRequest(String account) {
-
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_MANUAL_STOP, false);
-		SentBody sent = new SentBody();
-		Properties sysPro = System.getProperties();
-		sent.setKey(CIMConstant.RequestKey.CLIENT_BIND);
-		sent.put("account", account);
-		sent.put("deviceId", getDeviceId());
-		sent.put("channel", "java");
-		sent.put("device", sysPro.getProperty("os.name"));
-		sent.put("version", getClientVersion());
-		sent.put("osVersion", sysPro.getProperty("os.version"));
-		sendRequest(sent);
-	}
-
-	/**
-	 * 设置一个账号登录到服务端
-	 * 
-	 * @param account
-	 *            用户唯一ID
-	 */
-	public static void bindAccount(String account) {
-
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-		if (isManualDestory || account == null || account.trim().length() == 0) {
-			return;
-		}
-		sendBindRequest(account);
-
-	}
-
-	protected static boolean autoBindDeviceId() {
-
-		String account = getAccount();
-
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-		boolean isManualStoped = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_MANUAL_STOP);
-		if (isManualStoped || account == null || account.trim().length() == 0 || isManualDestory) {
-			return false;
-		}
-
-		sendBindRequest(account);
-
-		return true;
-	}
-
-	/**
-	 * 发送一个CIM请求
-	 * 
-	 * @param context
-	 * @body
-	 */
-	public static void sendRequest(SentBody body) {
-
-		boolean isManualStop = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_MANUAL_STOP);
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-
-		if (isManualStop || isManualDestory) {
-			return;
-		}
-
-		Intent serviceIntent = new Intent();
-		serviceIntent.putExtra(SentBody.class.getName(), body);
-		serviceIntent.setAction(ACTION_SEND_REQUEST_BODY);
-		startService(serviceIntent);
-
-	}
-
-	/**
-	 * 停止接受推送，将会退出当前账号登录，端口与服务端的连接
-	 * 
-	 * @param context
-	 */
-	public static void stop() {
-
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-		if (isManualDestory) {
-			return;
-		}
-
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_MANUAL_STOP, true);
-
-		startService(new Intent(ACTION_CLOSE_CIM_CONNECTION));
-
-	}
-
-	/**
-	 * 完全销毁CIM，一般用于完全退出程序，调用resume将不能恢复
-	 * 
-	 * @param context
-	 */
-	public static void destroy() {
-
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_CIM_DESTROYED, true);
-
-		Intent serviceIntent = new Intent();
-		serviceIntent.setAction(ACTION_DESTORY);
-		startService(serviceIntent);
-
-	}
-
-	/**
-	 * 重新恢复接收推送，重新连接服务端，并登录当前账号如果aotuBind == true
-	 * 
-	 * @param context
-	 * @param aotuBind
-	 */
-	public static void resume() {
-
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-		if (isManualDestory) {
-			return;
-		}
-
-		autoBindDeviceId();
-	}
-
-	public static boolean isConnected() {
-		return CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_CONNECTION_STATE);
-	}
-
-	public static int getState() {
-		boolean isManualDestory = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_CIM_DESTROYED);
-		if (isManualDestory) {
-			return STATE_DESTROYED;
-		}
-
-		boolean isManualStop = CIMCacheManager.getInstance().getBoolean(CIMCacheManager.KEY_MANUAL_STOP);
-		if (isManualStop) {
-			return STATE_STOPED;
-		}
-
-		return STATE_NORMAL;
-	}
-
-
-	public static String getClientVersion() {
-		return System.getProperties().getProperty(CIMConstant.ConfigKey.CLIENT_VERSION);
-	}
-
-	public static String getAccount() {
-		return System.getProperties().getProperty(CIMConstant.ConfigKey.CLIENT_ACCOUNT);
-	}
-
-	public static void setAccount(String account) {
-		System.getProperties().put(CIMConstant.ConfigKey.CLIENT_ACCOUNT, account);
-	}
-
-	public static void setClientVersion(String version) {
-		System.getProperties().put(CIMConstant.ConfigKey.CLIENT_VERSION, version);
-	}
- 
-	private static String getDeviceId() {
-		
-		String deviceId = System.getProperties().getProperty(CIMConstant.ConfigKey.CLIENT_DEVICEID);
-		
-		if(deviceId == null) {
-			deviceId = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
-			System.getProperties().put(CIMConstant.ConfigKey.CLIENT_DEVICEID, deviceId);
-		}
-		return deviceId;
-	}
+    /**生成设备唯一ID*/
+    private val deviceId: String
+        get() {
+            var deviceId = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_DEVICEID)
+            if (deviceId == null) {
+                deviceId = UUID.randomUUID().toString().replace("-".toRegex(), "").toUpperCase()
+                System.getProperties()[IMConstant.ConfigKey.CLIENT_DEVICEID] = deviceId
+            }
+            return deviceId
+        }
 }

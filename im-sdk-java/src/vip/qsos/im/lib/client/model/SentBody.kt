@@ -1,100 +1,78 @@
-package com.farsunset.cim.sdk.client.model;
+package vip.qsos.im.lib.client.model
 
-import java.io.Serializable;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
-import com.farsunset.cim.sdk.model.proto.SentBodyProto;
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.model.proto.SendBodyProto
+import java.util.*
 
 /**
- * java |android 客户端请求结构
- *
+ * @author : 华清松
+ * 客户端发送的消息
  */
-public class SentBody implements Serializable, Protobufable {
+class SendBody : IProtobufAble {
 
-	private static final long serialVersionUID = 1L;
+    companion object {
+        private const val serialVersionUID = 1L
+    }
 
-	private String key;
+    /**请求key*/
+    var key: String? = null
+    /**发送时间*/
+    var timestamp: Long = 0L
+    /**发送数据集合*/
+    private val data: Hashtable<String, String> = Hashtable()
 
-	private HashMap<String, String> data = new HashMap<String, String>();;
+    init {
+        timestamp = System.currentTimeMillis()
+    }
 
-	private long timestamp;
+    private val keySet: Set<String>
+        get() = data.keys
 
-	public SentBody() {
-		timestamp = System.currentTimeMillis();
-	}
+    operator fun get(k: String): String? {
+        return data[k]
+    }
 
-	public String getKey() {
-		return key;
-	}
+    fun put(k: String?, v: String?) {
+        if (k == null || v == null) {
+            return
+        }
+        data[k] = v
+    }
 
-	public String get(String k) {
-		return data.get(k);
-	}
+    fun remove(k: String) {
+        data.remove(k)
+    }
 
-	public long getTimestamp() {
-		return timestamp;
-	}
+    fun putAll(map: Map<String, String>) {
+        data.putAll(map)
+    }
 
-	public void setTimestamp(long timestamp) {
-		this.timestamp = timestamp;
-	}
+    override val byteArray: ByteArray
+        get() {
+            val builder = SendBodyProto.Model.newBuilder()
+            builder.key = key
+            builder.timestamp = timestamp
+            if (data.isNotEmpty()) {
+                builder.putAllData(data)
+            }
+            return builder.build().toByteArray()
+        }
 
-	public void setKey(String key) {
-		this.key = key;
-	}
+    override val type: Byte = IMConstant.ProtobufType.SEND_BODY
 
-	public void put(String k, String v) {
-		if (v != null && k != null) {
-			data.put(k, v);
-		}
-	}
-
-	public void putAll(Map<String, String> map) {
-		data.putAll(map);
-	}
-
-	public Set<String> getKeySet() {
-		return data.keySet();
-	}
-
-	public void remove(String k) {
-		data.remove(k);
-	}
-
-	@Override
-	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("#SentBody#").append("\n");
-		;
-		buffer.append("key:").append(key).append("\n");
-		buffer.append("timestamp:").append(timestamp).append("\n");
-		if (!data.isEmpty()) {
-			buffer.append("data{").append("\n");
-			for (String key : getKeySet()) {
-				buffer.append(key).append(":").append(this.get(key)).append("\n");
-			}
-			buffer.append("}");
-		}
-		return buffer.toString();
-	}
-
-	@Override
-	public byte[] getByteArray() {
-		SentBodyProto.Model.Builder builder = SentBodyProto.Model.newBuilder();
-		builder.setKey(key);
-		builder.setTimestamp(timestamp);
-		if (!data.isEmpty()) {
-			builder.putAllData(data);
-		}
-		return builder.build().toByteArray();
-	}
-
-	@Override
-	public byte getType() {
-		return CIMConstant.ProtobufType.SENTBODY;
-	}
+    override fun toString(): String {
+        val buffer = StringBuffer()
+        buffer.append("\n#SendBody#")
+        buffer.append("\nkey:$key")
+        buffer.append("\ntimestamp:").append(timestamp)
+        if (!data.isEmpty) {
+            buffer.append("\ndata{").append("\n")
+            for (key in keySet) {
+                buffer.append("\t\t\n$key").append(":").append(this[key])
+            }
+            buffer.append("\n}")
+        }
+        return buffer.toString()
+    }
 
 }

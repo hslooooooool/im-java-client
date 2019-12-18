@@ -1,42 +1,28 @@
+package vip.qsos.im.lib.client.model
 
-package com.farsunset.cim.sdk.client.model;
-
-import java.io.Serializable;
-
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
+import vip.qsos.im.lib.client.constant.IMConstant
 
 /**
- * 服务端心跳请求
- *
+ * @author : 华清松
+ * 服务端心跳请求实体,客户端应发送一条心跳消息给服务器
  */
-public class HeartbeatRequest implements Serializable, Protobufable {
+class HeartbeatRequest private constructor() : IProtobufAble {
 
-	private static final long serialVersionUID = 1L;
-	private static final String TAG = "SERVER_HEARTBEAT_REQUEST";
-	private static final String CMD_HEARTBEAT_RESPONSE = "SR";
+    companion object {
+        private const val serialVersionUID = 1L
+        const val TAG = "SERVER_HEARTBEAT_REQUEST"
+        const val SERVER_HEARTBEAT_REQUEST = "SR"
+        val instance = HeartbeatRequest()
+    }
 
-	private static HeartbeatRequest object = new HeartbeatRequest();
+    override val byteArray: ByteArray
+        get() = SERVER_HEARTBEAT_REQUEST.toByteArray()
 
-	private HeartbeatRequest() {
+    override val type: Byte
+        get() = IMConstant.ProtobufType.HEART_RQ
 
-	}
-
-	public static HeartbeatRequest getInstance() {
-		return object;
-	}
-
-	@Override
-	public byte[] getByteArray() {
-		return CMD_HEARTBEAT_RESPONSE.getBytes();
-	}
-
-	public String toString() {
-		return TAG;
-	}
-
-	@Override
-	public byte getType() {
-		return CIMConstant.ProtobufType.S_H_RQ;
-	}
+    override fun toString(): String {
+        return TAG
+    }
 
 }

@@ -1,155 +1,69 @@
+package vip.qsos.im.lib.client.model
 
-package com.farsunset.cim.sdk.client.model;
-
-import java.io.Serializable;
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.model.proto.MessageProto
 
 /**
- * 消息对象
+ * @author : 华清松
+ * 自定义消息对象
  */
-public class Message implements Serializable {
+class Message : IProtobufAble {
 
-	private static final long serialVersionUID = 1L;
+    companion object {
+        private const val serialVersionUID = 1L
+    }
 
-	/**
-	 * 消息类型，用户自定义消息类别
-	 */
-	private long id;
+    /**消息ID*/
+    var id: Long = 0
+    /**消息类型，自定义消息类型*/
+    var action: String? = null
+    /**消息标题*/
+    var title: String? = null
+    /**消息类容，content 根据 format 数据格式进行解析*/
+    var content: String? = null
+    /**消息发送者账号*/
+    var sender: String? = null
+    /**消息发送者接收者*/
+    var receiver: String? = null
+    /**content 内容格式，如 text,json,xml数据格式*/
+    var format: String? = null
+    /**附加内容*/
+    var extra: String? = null
+    /**消息发送时间*/
+    var timestamp: Long = 0
 
-	/**
-	 * 消息类型，用户自定义消息类别
-	 */
-	private String action;
-	/**
-	 * 消息标题
-	 */
-	private String title;
-	/**
-	 * 消息类容，于action 组合为任何类型消息，content 根据 format 可表示为 text,json ,xml数据格式
-	 */
-	private String content;
+    init {
+        timestamp = System.currentTimeMillis()
+    }
 
-	/**
-	 * 消息发送者账号
-	 */
-	private String sender;
-	/**
-	 * 消息发送者接收者
-	 */
-	private String receiver;
+    override val type: Byte = IMConstant.ProtobufType.MESSAGE
 
-	/**
-	 * content 内容格式
-	 */
-	private String format;
+    override val byteArray: ByteArray
+        get() {
+            val builder = MessageProto.Model.newBuilder()
+            builder.id = id
+            builder.action = action
+            title?.let { builder.title = title }
+            builder.content = content
+            builder.sender = sender
+            builder.receiver = receiver
+            builder.format = format
+            extra?.let { builder.extra = extra }
+            builder.timestamp = timestamp
+            return builder.build().toByteArray()
+        }
 
-	/**
-	 * 附加内容 内容
-	 */
-	private String extra;
-
-	private long timestamp;
-
-	public Message() {
-		timestamp = System.currentTimeMillis();
-	}
-	
-	
-
-	public long getId() {
-		return id;
-	}
-
-
-
-	public void setId(long id) {
-		this.id = id;
-	}
-
-
-
-	public long getTimestamp() {
-		return timestamp;
-	}
-
-	public void setTimestamp(long timestamp) {
-		this.timestamp = timestamp;
-	}
-
-	public String getAction() {
-		return action;
-	}
-
-	public void setAction(String action) {
-		this.action = action;
-	}
-
-	public String getTitle() {
-		return title;
-	}
-
-	public void setTitle(String title) {
-		this.title = title;
-	}
-
-	public String getContent() {
-		return content;
-	}
-
-	public void setContent(String content) {
-		this.content = content;
-	}
-
-	public String getSender() {
-		return sender;
-	}
-
-	public void setSender(String sender) {
-		this.sender = sender;
-	}
-
-	public String getReceiver() {
-		return receiver;
-	}
-
-	public void setReceiver(String receiver) {
-		this.receiver = receiver;
-	}
-
-	public String getFormat() {
-		return format;
-	}
-
-	public void setFormat(String format) {
-		this.format = format;
-	}
-
-	public String getExtra() {
-		return extra;
-	}
-
-	public void setExtra(String extra) {
-		this.extra = extra;
-	}
-
-	public String toString() {
-
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("#Message#").append("\n");
-		buffer.append("id:").append(id).append("\n");
-		buffer.append("action:").append(action).append("\n");
-		buffer.append("title:").append(title).append("\n");
-		buffer.append("content:").append(content).append("\n");
-		buffer.append("extra:").append(extra).append("\n");
-		buffer.append("sender:").append(sender).append("\n");
-		buffer.append("receiver:").append(receiver).append("\n");
-		buffer.append("format:").append(format).append("\n");
-		buffer.append("timestamp:").append(timestamp);
-		return buffer.toString();
-	}
-
-
-	public boolean isNotEmpty(String txt) {
-		return txt != null && txt.trim().length() != 0;
-	}
+    override fun toString(): String {
+        return "\n#Message#" +
+                "\nid:" + id +
+                "\naction:" + action +
+                "\ntitle:" + title +
+                "\ncontent:" + content +
+                "\nextra:" + extra +
+                "\nsender:" + sender +
+                "\nreceiver:" + receiver +
+                "\nformat:" + format +
+                "\ntimestamp:" + timestamp
+    }
 
 }

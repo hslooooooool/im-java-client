@@ -1,61 +1,51 @@
+package vip.qsos.im.lib.client
 
-package com.farsunset.cim.sdk.client;
-
-import com.farsunset.cim.sdk.client.model.Intent;
-import com.farsunset.cim.sdk.client.model.SentBody;
+import vip.qsos.im.lib.client.model.Intent
+import vip.qsos.im.lib.client.model.SendBody
 
 /**
- * 与服务端连接服务
- *
+ * @author : 华清松
+ * 服务端连接服务
  */
-public class CIMPushService {
+class IMPushService {
 
-	protected final static int DEF_CIM_PORT = 23456;
-	private CIMConnectorManager manager;
+    companion object {
+        private var service: IMPushService? = null
+        val instance: IMPushService
+            get() {
+                if (service == null) {
+                    service = IMPushService()
+                }
+                return service!!
+            }
+    }
 
-	private static CIMPushService service;
-
-	public static CIMPushService getInstance() {
-		if (service == null) {
-			service = new CIMPushService();
-		}
-		return service;
-	}
-
-	public CIMPushService() {
-		manager = CIMConnectorManager.getManager();
-	}
-
-	public void onStartCommand(Intent intent) {
-
-		intent = (intent == null ? new Intent(CIMPushManager.ACTION_ACTIVATE_PUSH_SERVICE) : intent);
-
-		String action = intent.getAction();
-
-		if (CIMPushManager.ACTION_CREATE_CIM_CONNECTION.equals(action)) {
-			String host = CIMCacheManager.getInstance().getString(CIMCacheManager.KEY_CIM_SERVIER_HOST);
-			int port = CIMCacheManager.getInstance().getInt(CIMCacheManager.KEY_CIM_SERVIER_PORT);
-			manager.connect(host, port);
-		}
-
-		if (CIMPushManager.ACTION_SEND_REQUEST_BODY.equals(action)) {
-			manager.send((SentBody) intent.getExtra(SentBody.class.getName()));
-		}
-
-		if (CIMPushManager.ACTION_CLOSE_CIM_CONNECTION.equals(action)) {
-			manager.closeSession();
-		}
-
-		if (CIMPushManager.ACTION_DESTORY.equals(action)) {
-			manager.destroy();
-		}
-
-		if (CIMPushManager.ACTION_ACTIVATE_PUSH_SERVICE.equals(action) && !manager.isConnected()) {
-
-			String host = CIMCacheManager.getInstance().getString(CIMCacheManager.KEY_CIM_SERVIER_HOST);
-			int port = CIMCacheManager.getInstance().getInt(CIMCacheManager.KEY_CIM_SERVIER_PORT);
-			manager.connect(host, port);
-		}
-	}
-
+    /**处理消息事件*/
+    fun onStartCommand(intent: Intent?) {
+        val mIntent = intent ?: Intent(IMManagerHelper.ACTION_ACTIVATE_PUSH_SERVICE)
+        when (mIntent.action) {
+            IMManagerHelper.ACTION_CREATE_CONNECTION -> {
+                val host: String? = IMCacheManager.instance.getString(IMCacheManager.KEY_IM_SERVER_HOST)
+                val port: Int = IMCacheManager.instance.getInt(IMCacheManager.KEY_IM_SERVER_PORT)
+                host?.let {
+                    IMConnectorManager.instance!!.connect(host, port)
+                }
+            }
+            IMManagerHelper.ACTION_SEND_REQUEST_BODY -> {
+                IMConnectorManager.instance!!.send(mIntent.getExtra(SendBody::class.java.name) as SendBody)
+            }
+            IMManagerHelper.ACTION_CLOSE_CONNECTION -> {
+                IMConnectorManager.instance!!.closeConnect()
+            }
+            IMManagerHelper.ACTION_DESTROY_CONNECTION -> {
+                IMConnectorManager.instance!!.destroy()
+            }
+            IMManagerHelper.ACTION_ACTIVATE_PUSH_SERVICE -> {
+                if (!IMConnectorManager.instance!!.isConnected) {
+                    /**未连接，重连*/
+                    this.onStartCommand(Intent(IMManagerHelper.ACTION_CREATE_CONNECTION))
+                }
+            }
+        }
+    }
 }

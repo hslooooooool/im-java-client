@@ -1,59 +1,60 @@
-package com.farsunset.cim.sdk.client;
+package vip.qsos.im.lib.client
 
-import java.util.HashMap;
+import java.util.*
 
-class CIMCacheManager {
+/**
+ * @author : 华清松
+ * 消息缓存
+ */
+class IMCacheManager {
 
-	private static HashMap<String, String> CIM_CONFIG_INFO = new HashMap<String, String>();
+    fun remove(key: String?) {
+        IM_CONFIG_INFO.remove(key)
+    }
 
-	public static final String KEY_MANUAL_STOP = "KEY_MANUAL_STOP";
+    fun putString(key: String, value: String?) {
+        IM_CONFIG_INFO[key] = value
+    }
 
-	public static final String KEY_CIM_DESTROYED = "KEY_CIM_DESTROYED";
+    fun getString(key: String?): String? {
+        return IM_CONFIG_INFO[key]
+    }
 
-	public static final String KEY_CIM_SERVIER_HOST = "KEY_CIM_SERVIER_HOST";
+    fun putBoolean(key: String, value: Boolean) {
+        putString(key, java.lang.Boolean.toString(value))
+    }
 
-	public static final String KEY_CIM_SERVIER_PORT = "KEY_CIM_SERVIER_PORT";
+    fun getBoolean(key: String?): Boolean {
+        val value = getString(key)
+        return if (value == null) false else java.lang.Boolean.parseBoolean(value)
+    }
 
-	public static final String KEY_CIM_CONNECTION_STATE = "KEY_CIM_CONNECTION_STATE";
+    fun putInt(key: String, value: Int) {
+        putString(key, value.toString())
+    }
 
-	static CIMCacheManager toolkit;
+    fun getInt(key: String?): Int {
+        val value = getString(key)
+        return value?.toInt() ?: 0
+    }
 
-	public static CIMCacheManager getInstance() {
-		if (toolkit == null) {
-			toolkit = new CIMCacheManager();
-		}
-		return toolkit;
-	}
+    companion object {
+        /**暂存配置信息*/
+        private val IM_CONFIG_INFO = HashMap<String, String?>()
 
-	public void remove(String key) {
-		CIM_CONFIG_INFO.remove(key);
-	}
+        const val KEY_MANUAL_STOP = "KEY_MANUAL_STOP"
+        const val KEY_IM_DESTROY = "KEY_IM_DESTROY"
+        const val KEY_IM_SERVER_HOST = "KEY_IM_SERVER_HOST"
+        const val KEY_IM_SERVER_PORT = "KEY_IM_SERVER_PORT"
+        const val KEY_IM_CONNECTION_STATE = "KEY_IM_CONNECTION_STATE"
 
-	public void putString(String key, String value) {
-		CIM_CONFIG_INFO.put(key, value);
-
-	}
-
-	public String getString(String key) {
-		return CIM_CONFIG_INFO.get(key);
-	}
-
-	public void putBoolean(String key, boolean value) {
-		putString(key, Boolean.toString(value));
-	}
-
-	public boolean getBoolean(String key) {
-		String value = getString(key);
-		return value == null ? false : Boolean.parseBoolean(value);
-	}
-
-	public void putInt(String key, int value) {
-		putString(key, String.valueOf(value));
-	}
-
-	public int getInt(String key) {
-		String value = getString(key);
-		return value == null ? 0 : Integer.parseInt(value);
-	}
-
+        var manager: IMCacheManager? = null
+        val instance: IMCacheManager
+            get() {
+                if (manager == null) {
+                    manager = IMCacheManager()
+                }
+                return manager!!
+            }
+    }
 }

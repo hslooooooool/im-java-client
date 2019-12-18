@@ -1,109 +1,93 @@
+package vip.qsos.im.lib.client.coder
 
-package com.farsunset.cim.sdk.client.coder;
-
-
-import java.nio.ByteBuffer;
-
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
-import com.farsunset.cim.sdk.client.model.HeartbeatRequest;
-import com.farsunset.cim.sdk.client.model.Message;
-import com.farsunset.cim.sdk.client.model.ReplyBody;
-import com.farsunset.cim.sdk.model.proto.MessageProto;
-import com.farsunset.cim.sdk.model.proto.ReplyBodyProto;
-import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.InvalidProtocolBufferException
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.client.model.HeartbeatRequest
+import vip.qsos.im.lib.client.model.Message
+import vip.qsos.im.lib.client.model.ReplyBody
+import vip.qsos.im.lib.model.proto.MessageProto
+import vip.qsos.im.lib.model.proto.ReplyBodyProto
+import java.nio.ByteBuffer
 
 /**
- * 客户端消息解码
+ * @author : 华清松
+ * 服务端发送的消息解码
  */
-public class ClientMessageDecoder {
+class IMMessageDecoder {
 
+    /**服务器消息解析*/
+    fun decode(buffer: ByteBuffer): Any? {
+        /**消息头3位，小于3位消息体为 null */
+        if (buffer.remaining() < IMConstant.DATA_HEADER_LENGTH) {
+            return null
+        }
+        buffer.mark()
+        /**获取消息类型*/
+        val type = buffer.get()
+        /**获取消息体长度低位*/
+        val lv = buffer.get()
+        /**获取消息体长度高位*/
+        val hv = buffer.get()
+        /**获取到消息体长度*/
+        val length = getContentLength(lv.toInt(), hv.toInt())
 
-	public Object doDecode(ByteBuffer iobuffer)   {
-		
-		/**
-		 * 消息头3位
-		 */
-		if (iobuffer.remaining() < CIMConstant.DATA_HEADER_LENGTH) {
-			return null;
-		}
+        /**消息体没有接收完整，则重置读取，等待下一次重新读取*/
+        if (length > buffer.remaining()) {
+            buffer.reset()
+            return null
+        }
 
-		iobuffer.mark();
+        /**获取到消息体数组*/
+        val dataBytes = ByteArray(length)
+        buffer.get(dataBytes, 0, length)
+        buffer.position(0)
+        return try {
+            mappingMessageObject(dataBytes, type)
+        } catch (e: InvalidProtocolBufferException) {
+            null
+        }
+    }
 
-		byte conetnType = iobuffer.get();
+    /**构建消息实体*/
+    @Throws(InvalidProtocolBufferException::class)
+    private fun mappingMessageObject(bytes: ByteArray, type: Byte): Any? {
+        return when (type) {
+            IMConstant.ProtobufType.HEART_RQ -> HeartbeatRequest.instance
+            IMConstant.ProtobufType.REPLY_BODY -> {
+                val bodyProto = ReplyBodyProto.Model.parseFrom(bytes)
+                val body = ReplyBody()
+                body.key = bodyProto.key
+                body.timestamp = bodyProto.timestamp
+                body.putAll(bodyProto.dataMap)
+                body.code = bodyProto.code
+                body.message = bodyProto.message
 
-		byte lv = iobuffer.get();// int 低位
-		byte hv = iobuffer.get();// int 高位
+                body
+            }
+            IMConstant.ProtobufType.MESSAGE -> {
+                val bodyProto = MessageProto.Model.parseFrom(bytes)
+                val message = Message()
+                message.id = bodyProto.id
+                message.action = bodyProto.action
+                message.content = bodyProto.content
+                message.sender = bodyProto.sender
+                message.receiver = bodyProto.receiver
+                message.title = bodyProto.title
+                message.extra = bodyProto.extra
+                message.timestamp = bodyProto.timestamp
+                message.format = bodyProto.format
 
-		int conetnLength = getContentLength(lv, hv);
+                message
+            }
+            else -> null
+        }
+    }
 
-		// 如果消息体没有接收完整，则重置读取，等待下一次重新读取
-		if (conetnLength > iobuffer.remaining()) {
-			iobuffer.reset();
-			return null;
-		}
-
-		byte[] dataBytes = new byte[conetnLength];
-		iobuffer.get(dataBytes, 0, conetnLength);
-
-		iobuffer.position(0);
-		
-		try {
-			return mappingMessageObject(dataBytes, conetnType);
-		} catch (InvalidProtocolBufferException e) {
-			e.printStackTrace();
-			return null;
-		}
-		
-	}
-
-	private Object mappingMessageObject(byte[] bytes, byte type) throws InvalidProtocolBufferException {
-
-		if (CIMConstant.ProtobufType.S_H_RQ == type) {
-			HeartbeatRequest request = HeartbeatRequest.getInstance();
-			return request;
-		}
-
-		if (CIMConstant.ProtobufType.REPLYBODY == type) {
-			ReplyBodyProto.Model bodyProto = ReplyBodyProto.Model.parseFrom(bytes);
-			ReplyBody body = new ReplyBody();
-			body.setKey(bodyProto.getKey());
-			body.setTimestamp(bodyProto.getTimestamp());
-			body.putAll(bodyProto.getDataMap());
-			body.setCode(bodyProto.getCode());
-			body.setMessage(bodyProto.getMessage());
-			return body;
-		}
-
-		if (CIMConstant.ProtobufType.MESSAGE == type) {
-			MessageProto.Model bodyProto = MessageProto.Model.parseFrom(bytes);
-			Message message = new Message();
-			message.setId(bodyProto.getId());
-			message.setAction(bodyProto.getAction());
-			message.setContent(bodyProto.getContent());
-			message.setSender(bodyProto.getSender());
-			message.setReceiver(bodyProto.getReceiver());
-			message.setTitle(bodyProto.getTitle());
-			message.setExtra(bodyProto.getExtra());
-			message.setTimestamp(bodyProto.getTimestamp());
-			message.setFormat(bodyProto.getFormat());
-			return message;
-		}
-
-		return null;
-
-	}
-
-	/**
-	 * 解析消息体长度
-	 * 
-	 * @param type
-	 * @param length
-	 * @return
-	 */
-	private int getContentLength(byte lv, byte hv) {
-		int l = (lv & 0xff);
-		int h = (hv & 0xff);
-		return (l | (h <<= 8));
-	}
+    /**解析消息体长度*/
+    private fun getContentLength(lv: Int, hv: Int): Int {
+        val l = lv and 0xff
+        val h = hv and 0xff
+        return l or (h shl 8)
+    }
 
 }

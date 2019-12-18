@@ -1,116 +1,65 @@
+package vip.qsos.im.lib.client.model
 
-package com.farsunset.cim.sdk.client.model;
-
-import java.io.Serializable;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.io.Serializable
+import java.util.*
 
 /**
- * 请求应答对象
- *
+ * @author : 华清松
+ * 服务器应答对象，客户端主动请求服务器后收到的回执消息
  */
-public class ReplyBody implements Serializable {
+class ReplyBody : Serializable {
 
-	private static final long serialVersionUID = 1L;
+    companion object {
+        private const val serialVersionUID = 1L
+    }
 
-	/**
-	 * 请求key
-	 */
-	private String key;
+    /**请求key*/
+    var key: String? = null
+    /**返回码*/
+    var code: String? = null
+    /**返回说明*/
+    var message: String? = null
+    /**返回时间*/
+    var timestamp: Long = 0L
+    /**返回数据集合*/
+    private val data: Hashtable<String, String> = Hashtable()
 
-	/**
-	 * 返回码
-	 */
-	private String code;
+    private val keySet: Set<String>
+        get() = data.keys
 
-	/**
-	 * 返回说明
-	 */
-	private String message;
+    operator fun get(k: String): String? {
+        return data[k]
+    }
 
-	/**
-	 * 返回数据集合
-	 */
-	private HashMap<String, String> data;
+    fun put(k: String?, v: String?) {
+        if (k == null || v == null) {
+            return
+        }
+        data[k] = v
+    }
 
-	private long timestamp;
+    fun remove(k: String) {
+        data.remove(k)
+    }
 
-	public ReplyBody() {
-		data = new HashMap<String, String>();
-		timestamp = System.currentTimeMillis();
-	}
+    fun putAll(map: Map<String, String>) {
+        data.putAll(map)
+    }
 
-	public long getTimestamp() {
-		return timestamp;
-	}
-
-	public void setTimestamp(long timestamp) {
-		this.timestamp = timestamp;
-	}
-
-	public String getKey() {
-		return key;
-	}
-
-	public void setKey(String key) {
-		this.key = key;
-	}
-
-	public void put(String k, String v) {
-		if (v != null && k != null) {
-			data.put(k, v);
-		}
-	}
-
-	public String get(String k) {
-		return data.get(k);
-	}
-
-	public void remove(String k) {
-		data.remove(k);
-	}
-
-	public String getMessage() {
-		return message;
-	}
-
-	public void setMessage(String message) {
-		this.message = message;
-	}
-
-	public void putAll(Map<String, String> map) {
-		data.putAll(map);
-	}
-
-	public Set<String> getKeySet() {
-		return data.keySet();
-	}
-
-	public String getCode() {
-		return code;
-	}
-
-	public void setCode(String code) {
-		this.code = code;
-	}
-
-	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("#ReplyBody#").append("\n");
-		buffer.append("key:").append(this.getKey()).append("\n");
-		buffer.append("timestamp:").append(timestamp).append("\n");
-		buffer.append("code:").append(code).append("\n");
-
-		if (!data.isEmpty()) {
-			buffer.append("data{").append("\n");
-			for (String key : getKeySet()) {
-				buffer.append(key).append(":").append(this.get(key)).append("\n");
-			}
-			buffer.append("}");
-		}
-
-		return buffer.toString();
-	}
+    override fun toString(): String {
+        val buffer = StringBuffer()
+        buffer.append("\n#ReplyBody#")
+        buffer.append("\nkey:$key")
+        buffer.append("\ntimestamp:$timestamp")
+        buffer.append("\ncode:$code")
+        if (!data.isEmpty) {
+            buffer.append("\ndata{")
+            for (key in keySet) {
+                buffer.append("\t\t\n$key").append(":").append(this[key])
+            }
+            buffer.append("\n}")
+        }
+        return buffer.toString()
+    }
 
 }

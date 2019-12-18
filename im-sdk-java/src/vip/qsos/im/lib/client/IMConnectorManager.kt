@@ -1,351 +1,254 @@
+package vip.qsos.im.lib.client
 
-package com.farsunset.cim.sdk.client;
-
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
-
-import com.farsunset.cim.sdk.client.coder.CIMLogger;
-import com.farsunset.cim.sdk.client.coder.ClientMessageDecoder;
-import com.farsunset.cim.sdk.client.coder.ClientMessageEncoder;
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
-import com.farsunset.cim.sdk.client.model.HeartbeatRequest;
-import com.farsunset.cim.sdk.client.model.HeartbeatResponse;
-import com.farsunset.cim.sdk.client.model.Intent;
-import com.farsunset.cim.sdk.client.model.Message;
-import com.farsunset.cim.sdk.client.model.Protobufable;
-import com.farsunset.cim.sdk.client.model.ReplyBody;
-import com.farsunset.cim.sdk.client.model.SentBody;
-
+import vip.qsos.im.lib.client.coder.IMLogger
+import vip.qsos.im.lib.client.coder.IMMessageDecoder
+import vip.qsos.im.lib.client.coder.IMMessageEncoder
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.client.model.*
+import java.io.IOException
+import java.lang.Runnable
+import java.net.ConnectException
+import java.net.InetSocketAddress
+import java.net.SocketTimeoutException
+import java.nio.ByteBuffer
+import java.nio.channels.SocketChannel
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 
 /**
- * 连接服务端管理，cim核心处理类，管理连接，以及消息处理
- * 
- * @author 3979434@qq.com
+ * @author : 华清松
+ * 服务端连接管理与消息处理
  */
-class CIMConnectorManager {
+class IMConnectorManager : IConnectManager {
+    companion object {
+        @get:Synchronized
+        var instance: IMConnectorManager? = null
+            get() {
+                if (field == null) {
+                    field = IMConnectorManager()
+                }
+                return field!!
+            }
+            private set
 
-	private static CIMConnectorManager manager;
-	
-	private final int READ_BUFFER_SIZE = 2048;
-	private final int WRITE_BUFFER_SIZE = 1024;
-	private final int CONNECT_TIME_OUT = 10 * 1000;
+        const val READ_BUFFER_SIZE = 2048
+        const val WRITE_BUFFER_SIZE = 1024
+        /**连接服务器的超时时长，毫秒*/
+        const val CONNECT_TIME_OUT = 10 * 1000
+    }
 
-    private final CIMLogger LOGGER = CIMLogger.getLogger();
+    override val mSemaphore: Semaphore = Semaphore(1, true)
+    override var mSocketChannel: SocketChannel? = null
+    override val mMessageEncoder: IMMessageEncoder = IMMessageEncoder()
+    override val mMessageDecoder: IMMessageDecoder = IMMessageDecoder()
+    override var mReadBuffer: ByteBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE)
 
-	private SocketChannel socketChannel ;
-	
-    private ByteBuffer readBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE);
+    override val mSocketSendExecutor: ExecutorService = Executors.newFixedThreadPool(1) { r ->
+        Thread(r, "SocketSend-")
+    }
+    override val mSocketConnectExecutor: ExecutorService = Executors.newFixedThreadPool(1) { r ->
+        Thread(r, "SocketConnect-")
+    }
 
-	private ExecutorService workerExecutor = Executors.newFixedThreadPool(1,new ThreadFactory() {
-		@Override
-		public Thread newThread(Runnable r) {
-			return new Thread(r,"worker-");
-		}
-	});
-	private ExecutorService bossExecutor = Executors.newFixedThreadPool(1,new ThreadFactory() {
-		@Override
-		public Thread newThread(Runnable r) {
-			return new Thread(r,"boss-");
-		}
-	});
-	private ExecutorService eventExecutor = Executors.newFixedThreadPool(1,new ThreadFactory() {
-		@Override
-		public Thread newThread(Runnable r) {
-			return new Thread(r,"event-");
-		}
-	});
-	
-	private Semaphore semaphore = new Semaphore(1, true);
+    override val mBroadcastExecutor: ExecutorService = Executors.newFixedThreadPool(1) { r ->
+        Thread(r, "SocketBroadcast-")
+    }
 
-	
-	private ClientMessageEncoder messageEncoder = new  ClientMessageEncoder();
-	private ClientMessageDecoder messageDecoder = new  ClientMessageDecoder();
-   
-	 
-	
-	public synchronized static CIMConnectorManager getManager() {
-		
-		if (manager == null) {
-			manager = new CIMConnectorManager();
-		}
-		
-		return manager;
+    override val isConnected: Boolean
+        get() = this.mSocketChannel != null && this.mSocketChannel!!.isConnected
 
-	}
+    override fun connect(host: String, port: Int) {
+        if (isConnected) {
+            return
+        }
+        this.mSocketConnectExecutor.execute(Runnable {
+            if (isConnected) {
+                return@Runnable
+            }
+            IMLogger.LOGGER.connectStart(host, port)
+            IMCacheManager.instance.putBoolean(IMCacheManager.KEY_IM_CONNECTION_STATE, false)
+            try {
+                this.mSemaphore.acquire()
+                this.mSocketChannel = SocketChannel.open()
+                this.mSocketChannel!!.configureBlocking(true)
+                this.mSocketChannel!!.socket().tcpNoDelay = true
+                this.mSocketChannel!!.socket().keepAlive = true
+                this.mSocketChannel!!.socket().receiveBufferSize = READ_BUFFER_SIZE
+                this.mSocketChannel!!.socket().sendBufferSize = WRITE_BUFFER_SIZE
+                this.mSocketChannel!!.socket().connect(InetSocketAddress(host, port), CONNECT_TIME_OUT)
+                this.mSemaphore.release()
 
-	public void connect(final String host, final int port) {
- 
-		 
-		if (isConnected()) {
-			return;
-		}
-	 
-		bossExecutor.execute(new Runnable() {
-			@Override
-			public void run() {
+                this.channelCreated()
 
-				if (isConnected()) {
-					return;
-				}
-				
-	            LOGGER.startConnect(host, port);
-				
-				CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_CIM_CONNECTION_STATE, false);
-				
- 				try {
- 					
- 					semaphore.acquire();
+                var result = 1
+                while (result > 0) {
+                    result = this.mSocketChannel!!.read(this.mReadBuffer)
+                    if (result > 0) {
+                        if (this.mReadBuffer.position() == this.mReadBuffer.capacity()) {
+                            mReadBuffer = extendByteBuffer(this.mReadBuffer)
+                        }
+                        this.handelSocketReadEvent(result)
+                    }
+                }
+                this.handelSocketReadEvent(result)
+            } catch (ignore: ConnectException) {
+                this.mSemaphore.release()
+                this.handleConnectAbortedEvent()
+            } catch (ignore: SocketTimeoutException) {
+                this.mSemaphore.release()
+                this.handleConnectAbortedEvent()
+            } catch (ignore: IOException) {
+                this.mSemaphore.release()
+                this.handelDisconnectedEvent()
+            } catch (ignore: InterruptedException) {
+                this.mSemaphore.release()
+            } finally {
+                this.mSemaphore.release()
+            }
+        })
+    }
 
- 					socketChannel = SocketChannel.open();
- 					socketChannel.configureBlocking(true);
- 		            socketChannel.socket().setTcpNoDelay(true);
- 		            socketChannel.socket().setKeepAlive(true);
- 		            socketChannel.socket().setReceiveBufferSize(READ_BUFFER_SIZE);
- 		            socketChannel.socket().setSendBufferSize(WRITE_BUFFER_SIZE);
- 		            
- 					socketChannel.socket().connect(new InetSocketAddress(host, port),CONNECT_TIME_OUT);
- 					
- 					semaphore.release();
- 					
- 					handelConnectedEvent();
- 					
- 				
- 					int result = -1;
-						
-					while((result = socketChannel.read(readBuffer)) > 0) {
-							
-						if(readBuffer.position() == readBuffer.capacity()) {
-							extendByteBuffer();
-						}
-							
-						handelSocketReadEvent(result);
-						
-					}
-					
-					handelSocketReadEvent(result);
-					
-				}catch(ConnectException ignore){
-					semaphore.release();
-					handleConnectAbortedEvent();
-				}catch(SocketTimeoutException ignore){
-					semaphore.release();
-					handleConnectAbortedEvent();
-				}catch(IOException ignore) {
-					semaphore.release();
-					handelDisconnectedEvent();
-				}catch (InterruptedException ignore) {
-					semaphore.release();
-				} 
-			}
-		});
-	}
-	 
- 
-	
-	private void handelDisconnectedEvent() {
-		closeSession();
-	}
-	
-    private void handleConnectAbortedEvent() {
+    override fun handelDisconnectedEvent() {
+        this.closeConnect()
+    }
 
-		long interval = CIMConstant.RECONN_INTERVAL_TIME - (5 * 1000 - new Random().nextInt(15 * 1000));
-		
-		LOGGER.connectFailure(interval);
-		
-		Intent intent = new Intent();
-		intent.setAction(CIMConstant.IntentAction.ACTION_CONNECTION_FAILED);
-		intent.putExtra("interval", interval);
-		sendBroadcast(intent);
+    private fun handleConnectAbortedEvent() {
+        val interval: Long = IMConstant.RECONNECT_INTERVAL_TIME - (5 * 1000 - Random().nextInt(15 * 1000))
+        IMLogger.LOGGER.connectFailed(interval)
+        val intent = Intent()
+        intent.action = IMConstant.IntentAction.ACTION_CONNECTION_FAILED
+        intent.putExtra("interval", interval)
+        sendBroadcast(intent)
+    }
 
-	}
-	 
-	private void handelConnectedEvent() throws IOException {
-		
-		sessionCreated();
-	}
-	
-	private void handelSocketReadEvent(int result) throws IOException   {
-		
-		if(result == -1) {
-		    closeSession();
-		    return;
-		}
-	
-		
-	    readBuffer.position(0);
-	     
-		Object message = messageDecoder.doDecode(readBuffer);
-		
-		if(message == null) {
-			return;
-		}
-		
-		LOGGER.messageReceived(socketChannel,message);
+    @Throws(IOException::class)
+    override fun handelSocketReadEvent(result: Int) {
+        if (result == -1) {
+            this.closeConnect()
+            return
+        }
+        this.mReadBuffer.position(0)
+        val message = this.mMessageDecoder.decode(this.mReadBuffer) ?: return
+        IMLogger.LOGGER.received(this.mSocketChannel!!, message)
 
-		if(isHeartbeatRequest(message)) {
+        if (message is HeartbeatRequest) {
+            send(HeartbeatResponse.instance)
+            return
+        }
+        messageReceived(message)
+    }
 
-			send(getHeartbeatResponse());
-			
-			return;
-		}
-		
-		this.messageReceived(message);
-	}
-	
-	
-	private void extendByteBuffer() {
-		
-		ByteBuffer newBuffer = ByteBuffer.allocate(readBuffer.capacity() + READ_BUFFER_SIZE / 2);
-		readBuffer.position(0);
-		newBuffer.put(readBuffer);
-		
-		readBuffer.clear();
-		readBuffer = newBuffer;
-	}
-	
-	
-   public void send(final Protobufable body) {
-		
-	   if(!isConnected()) {
-			return;
-		}
-		
-		workerExecutor.execute(new Runnable() {
-			
-			@Override
-			public void run() {
-				int result = 0;
-				try {
-					
-					semaphore.acquire();
-					
-					ByteBuffer buffer =  messageEncoder.encode(body);
-					while(buffer.hasRemaining()){
-						result += socketChannel.write(buffer);   
-					}
-					 
-				} catch (Exception e) {
-					result = -1;
-				}finally {
-					
-					semaphore.release();
-					
-					if(result <= 0) {
-						closeSession();
-					}else {
-						messageSent(body);
-					}
-				} 
-			}
-		});
-	}
-  
+    override fun extendByteBuffer(mReadBuffer: ByteBuffer): ByteBuffer {
+        val newBuffer = ByteBuffer.allocate(mReadBuffer.capacity() + READ_BUFFER_SIZE / 2)
+        mReadBuffer.position(0)
+        newBuffer.put(this.mReadBuffer)
+        mReadBuffer.clear()
+        return newBuffer
+    }
 
-	public void sessionCreated() {
-		
-		LOGGER.sessionCreated(socketChannel);
-		
-		Intent intent = new Intent();
-		intent.setAction(CIMConstant.IntentAction.ACTION_CONNECTION_SUCCESSED);
-		sendBroadcast(intent);
-		
-	}
+    override fun send(body: IProtobufAble) {
+        if (!isConnected) {
+            this.messageSendFailed(body)
+            return
+        }
+        this.mSocketSendExecutor.execute {
+            var result = 0
+            try {
+                this.mSemaphore.acquire()
+                val buffer = this.mMessageEncoder.encode(body)
+                while (buffer.hasRemaining()) {
+                    result += this.mSocketChannel!!.write(buffer)
+                }
+            } catch (e: Exception) {
+                IMLogger.LOGGER.sendException(e)
+                result = -1
+            } finally {
+                this.mSemaphore.release()
+                if (result <= 0) {
+                    this.closeConnect()
+                } else {
+                    this.messageSendSuccess(body)
+                }
+            }
+        }
+    }
 
-	public void sessionClosed() {
+    override fun channelCreated() {
+        IMLogger.LOGGER.connectCreated(this.mSocketChannel!!)
+        val intent = Intent()
+        intent.action = IMConstant.IntentAction.ACTION_CONNECTION_SUCCESS
+        this.sendBroadcast(intent)
+    }
 
- 		LOGGER.sessionClosed(socketChannel);
+    override fun clearAll() {
+        IMLogger.LOGGER.connectClosed(this.mSocketChannel!!)
+        this.mReadBuffer.clear()
+        this.mSemaphore.release()
+        if (this.mReadBuffer.capacity() > READ_BUFFER_SIZE) {
+            this.mReadBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE)
+        }
+        val intent = Intent()
+        intent.action = IMConstant.IntentAction.ACTION_CONNECTION_CLOSED
+        this.sendBroadcast(intent)
+    }
 
-		readBuffer.clear();
-		
-		if(readBuffer.capacity() > READ_BUFFER_SIZE) {
-			readBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE);
-		}
-		
-		Intent intent = new Intent();
-		intent.setAction(CIMConstant.IntentAction.ACTION_CONNECTION_CLOSED);
-		sendBroadcast(intent);
-		
-	}
- 
-	public void messageReceived(Object obj) {
+    override fun messageReceived(message: Any) {
+        if (message is Message) {
+            val intent = Intent()
+            intent.action = IMConstant.IntentAction.ACTION_MESSAGE_RECEIVED
+            intent.putExtra(Message::class.java.name, message as Message?)
+            this.sendBroadcast(intent)
+        }
+        if (message is ReplyBody) {
+            val intent = Intent()
+            intent.action = IMConstant.IntentAction.ACTION_REPLY_RECEIVED
+            intent.putExtra(ReplyBody::class.java.name, message as ReplyBody?)
+            this.sendBroadcast(intent)
+        }
+    }
 
-		if (obj instanceof Message) {
+    override fun messageSendSuccess(message: Any) {
+        IMLogger.LOGGER.sendSuccess(this.mSocketChannel!!, message)
+        if (message is SendBody) {
+            val intent = Intent()
+            intent.action = IMConstant.IntentAction.ACTION_SEND_SUCCESS
+            intent.putExtra(SendBody::class.java.name, message as SendBody?)
+            this.sendBroadcast(intent)
+        }
+    }
 
-			Intent intent = new Intent();
-			intent.setAction(CIMConstant.IntentAction.ACTION_MESSAGE_RECEIVED);
-			intent.putExtra(Message.class.getName(), (Message) obj);
-			sendBroadcast(intent);
+    override fun messageSendFailed(message: Any) {
+        IMLogger.LOGGER.sendFailed(this.mSocketChannel!!, message)
+        if (message is SendBody) {
+            val intent = Intent()
+            intent.action = IMConstant.IntentAction.ACTION_SEND_FAILED
+            intent.putExtra(SendBody::class.java.name, message as SendBody?)
+            this.sendBroadcast(intent)
+        }
+    }
 
-		}
-		if (obj instanceof ReplyBody) {
+    override fun destroy() {
+        closeConnect()
+    }
 
-			Intent intent = new Intent();
-			intent.setAction(CIMConstant.IntentAction.ACTION_REPLY_RECEIVED);
-			intent.putExtra(ReplyBody.class.getName(), (ReplyBody) obj);
-			sendBroadcast(intent);
-		}
-	}
+    override fun closeConnect() {
+        if (!isConnected) {
+            return
+        }
+        try {
+            this.mSocketChannel!!.close()
+        } catch (ignore: IOException) {
+        } finally {
+            this.clearAll()
+        }
+    }
 
-	
-	public void messageSent(Object message) {
-		
-		LOGGER.messageSent(socketChannel, message);
-		
-		if (message instanceof SentBody) {
-			Intent intent = new Intent();
-			intent.setAction(CIMConstant.IntentAction.ACTION_SENT_SUCCESSED);
-			intent.putExtra(SentBody.class.getName(), (SentBody) message);
-			sendBroadcast(intent);
-		}
-	}
+    private fun sendBroadcast(intent: Intent) {
+        mBroadcastExecutor.execute {
+            IMEventBroadcastReceiver.instance.onReceive(intent)
+        }
+    }
 
-	public HeartbeatResponse getHeartbeatResponse() {
-		return HeartbeatResponse.getInstance();
-	}
-
-	public boolean isHeartbeatRequest(Object data) {
-		return data instanceof HeartbeatRequest;
-	}
- 
-    public void destroy() {
-		closeSession();
-	}
-
-	public boolean isConnected() {
-		return socketChannel != null && socketChannel.isConnected();
-	}
-
-	public void closeSession() {
-
-		if(!isConnected()) {
-			return;
-		}
-		
-		try {
-			socketChannel.close();
-		} catch (IOException ignore) {
-		}finally {
-			 this.sessionClosed();
-		}
-	}
- 
-	
-	private void sendBroadcast(final Intent intent) {
-		eventExecutor.execute(new Runnable() {
-			@Override
-			public void run() {
-				CIMEventBroadcastReceiver.getInstance().onReceive(intent);
-			}
-		});
-	}
-	 
 }

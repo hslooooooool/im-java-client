@@ -1,144 +1,100 @@
+package vip.qsos.im.lib.client
 
-package com.farsunset.cim.sdk.client;
-
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
-
-import com.farsunset.cim.sdk.client.constant.CIMConstant;
-import com.farsunset.cim.sdk.client.model.Intent;
-import com.farsunset.cim.sdk.client.model.Message;
-import com.farsunset.cim.sdk.client.model.ReplyBody;
-import com.farsunset.cim.sdk.client.model.SentBody;
+import vip.qsos.im.lib.client.constant.IMConstant
+import vip.qsos.im.lib.client.model.Intent
+import vip.qsos.im.lib.client.model.Message
+import vip.qsos.im.lib.client.model.ReplyBody
+import vip.qsos.im.lib.client.model.SendBody
+import java.util.*
 
 /**
- * 消息入口，所有消息都会经过这里
+ * @author : 华清松
+ * 消息接收广播服务
  */
-public class CIMEventBroadcastReceiver {
-	Random random = new Random();
-	private static CIMEventBroadcastReceiver recerver;
-	private CIMEventListener listener;
-	private Timer connectionHandler = new Timer();;
+class IMEventBroadcastReceiver {
 
-	public static CIMEventBroadcastReceiver getInstance() {
-		if (recerver == null) {
-			recerver = new CIMEventBroadcastReceiver();
-		}
-		return recerver;
-	}
+    var random = Random()
+    private var listener: IMEventListener? = null
+    private val connectionHandler = Timer()
+    fun setGlobalIMEventListener(ls: IMEventListener?) {
+        listener = ls
+    }
 
-	public void setGlobalCIMEventListener(CIMEventListener ls) {
-		listener = ls;
-	}
+    fun onReceive(intent: Intent) {
+        when (intent.action) {
+            IMConstant.IntentAction.ACTION_CONNECTION_CLOSED -> {
+                onInnerConnectionClosed()
+            }
+            IMConstant.IntentAction.ACTION_CONNECTION_FAILED -> {
+                val interval = intent.getLongExtra("interval", IMConstant.RECONNECT_INTERVAL_TIME)
+                onInnerConnectionFailed(interval)
+            }
+            IMConstant.IntentAction.ACTION_CONNECTION_SUCCESS -> {
+                onInnerConnectionSuccess()
+            }
+            IMConstant.IntentAction.ACTION_MESSAGE_RECEIVED -> {
+                onInnerMessageReceived(intent.getExtra(Message::class.java.name) as Message)
+            }
+            IMConstant.IntentAction.ACTION_REPLY_RECEIVED -> {
+                listener!!.onReplyReceived(intent.getExtra(ReplyBody::class.java.name) as ReplyBody)
+            }
+            IMConstant.IntentAction.ACTION_SEND_SUCCESS -> {
+                onSentSucceed(intent.getExtra(SendBody::class.java.name) as SendBody)
+            }
+            IMConstant.IntentAction.ACTION_UNCAUGHT_EXCEPTION -> {
+                onUncaughtException(intent.getExtra(Exception::class.java.name) as Exception)
+            }
+            IMConstant.IntentAction.ACTION_CONNECTION_RECOVERY -> {
+                IMManagerHelper.connect()
+            }
+        }
+    }
 
-	public void onReceive(Intent intent) {
+    private fun onInnerConnectionClosed() {
+        listener!!.onConnectionClosed()
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_IM_CONNECTION_STATE, false)
+        IMManagerHelper.connect()
+    }
 
-		/*
-		 * cim断开服务器事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_CONNECTION_CLOSED)) {
-			onInnerConnectionClosed();
-		}
+    private fun onInnerConnectionFailed(interval: Long) {
+        connectionHandler.schedule(ConnectionTask(), interval)
+        listener!!.onConnectionFailed()
+    }
 
-		/*
-		 * cim连接服务器失败事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_CONNECTION_FAILED)) {
-			long interval = intent.getLongExtra("interval", CIMConstant.RECONN_INTERVAL_TIME);
-			onInnerConnectionFailed(interval);
-		}
+    private fun onInnerConnectionSuccess() {
+        IMCacheManager.instance.putBoolean(IMCacheManager.KEY_IM_CONNECTION_STATE, true)
+        val autoBind = IMManagerHelper.autoBindDeviceId()
+        listener!!.onConnectionSuccess(autoBind)
+    }
 
-		/*
-		 * cim连接服务器成功事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_CONNECTION_SUCCESSED)) {
-			onInnerConnectionSuccessed();
-		}
+    private fun onUncaughtException(error: Throwable?) {}
 
-		/*
-		 * 收到推送消息事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_MESSAGE_RECEIVED)) {
-			onInnerMessageReceived((Message) intent.getExtra(Message.class.getName()));
-		}
+    private fun onInnerMessageReceived(message: Message) {
+        if (isForceOfflineMessage(message.action)) {
+            IMManagerHelper.stop()
+        }
+        listener!!.onMessageReceived(message)
+    }
 
-		/*
-		 * 获取收到replybody成功事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_REPLY_RECEIVED)) {
-			listener.onReplyReceived((ReplyBody) intent.getExtra(ReplyBody.class.getName()));
-		}
+    private fun isForceOfflineMessage(action: String?): Boolean {
+        return IMConstant.MessageAction.ACTION_999 == action
+    }
 
-		/*
-		 * 获取sendbody发送成功事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_SENT_SUCCESSED)) {
-			onSentSucceed((SentBody) intent.getExtra(SentBody.class.getName()));
-		}
+    private fun onSentSucceed(sendBody: SendBody?) {}
+    internal inner class ConnectionTask : TimerTask() {
+        override fun run() {
+            IMManagerHelper.connect()
+        }
+    }
 
-		/*
-		 * 获取cim数据传输异常事件
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_UNCAUGHT_EXCEPTION)) {
-			onUncaughtException((Exception) intent.getExtra(Exception.class.getName()));
-		}
-
-		/*
-		 * 重新连接，如果断开的话
-		 */
-		if (intent.getAction().equals(CIMConstant.IntentAction.ACTION_CONNECTION_RECOVERY)) {
-			CIMPushManager.connect();
-		}
-	}
-
-	private void onInnerConnectionClosed() {
-
-		listener.onConnectionClosed();
-
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_CIM_CONNECTION_STATE, false);
-		CIMPushManager.connect();
-
-	}
-
-	private void onInnerConnectionFailed(long interval) {
-
-		connectionHandler.schedule(new ConnectionTask(), interval);
-
-		listener.onConnectionFailed();
-	}
-
-	private void onInnerConnectionSuccessed() {
-		CIMCacheManager.getInstance().putBoolean(CIMCacheManager.KEY_CIM_CONNECTION_STATE, true);
-
-		boolean autoBind = CIMPushManager.autoBindDeviceId();
-
-		listener.onConnectionSuccessed(autoBind);
-	}
-
-	private void onUncaughtException(Throwable arg0) {
-	}
-
-	private void onInnerMessageReceived(com.farsunset.cim.sdk.client.model.Message message) {
-		if (isForceOfflineMessage(message.getAction())) {
-			CIMPushManager.stop();
-		}
-
-		listener.onMessageReceived(message);
-	}
-
-	private boolean isForceOfflineMessage(String action) {
-		return CIMConstant.MessageAction.ACTION_999.equals(action);
-	}
- 
-
-	private void onSentSucceed(SentBody body) {
-	}
-
-	class ConnectionTask extends TimerTask {
-
-		public void run() {
-			CIMPushManager.connect();
-		}
-	}
-
+    companion object {
+        private var receiver: IMEventBroadcastReceiver? = null
+        val instance: IMEventBroadcastReceiver
+            get() {
+                if (receiver == null) {
+                    receiver = IMEventBroadcastReceiver()
+                }
+                return receiver!!
+            }
+    }
 }

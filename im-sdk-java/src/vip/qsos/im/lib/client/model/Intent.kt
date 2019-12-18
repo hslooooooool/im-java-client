@@ -1,50 +1,40 @@
+package vip.qsos.im.lib.client.model
 
-package com.farsunset.cim.sdk.client.model;
-
-import java.io.Serializable;
-import java.util.HashMap;
+import java.io.Serializable
+import java.util.*
 
 /**
- * java |android 客户端请求结构
- *
+ * @author : 华清松
+ * 事件数据实体
  */
-public class Intent implements Serializable {
+class Intent : Serializable {
+    companion object {
+        private const val serialVersionUID = 1L
+    }
 
-	private static final long serialVersionUID = 1L;
+    var action: String? = null
+    private val data = HashMap<String, Any?>()
 
-	private String action;
+    constructor()
+    constructor(action: String?) {
+        this.action = action
+    }
 
-	private HashMap<String, Object> data = new HashMap<String, Object>();
+    fun putExtra(key: String, value: Any?) {
+        data[key] = value
+    }
 
-	public Intent() {
-	}
+    fun getExtra(key: String?): Any? {
+        return data[key]
+    }
 
-	public Intent(String action) {
-		this.action = action;
-	}
+    fun getLongExtra(key: String?, defValue: Long): Long {
+        val v = getExtra(key)
+        return try {
+            v.toString().toLong()
+        } catch (e: Exception) {
+            defValue
+        }
+    }
 
-	public String getAction() {
-		return action;
-	}
-
-	public void setAction(String action) {
-		this.action = action;
-	}
-
-	public void putExtra(String key, Object value) {
-		data.put(key, value);
-	}
-
-	public Object getExtra(String key) {
-		return data.get(key);
-	}
-
-	public long getLongExtra(String key, long defValue) {
-		Object v = getExtra(key);
-		try {
-			return Long.parseLong(v.toString());
-		} catch (Exception e) {
-			return defValue;
-		}
-	}
 }

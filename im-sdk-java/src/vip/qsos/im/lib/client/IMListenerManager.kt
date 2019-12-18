@@ -1,94 +1,83 @@
+package vip.qsos.im.lib.client
 
-package com.farsunset.cim.sdk.client;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.farsunset.cim.sdk.client.model.Message;
-import com.farsunset.cim.sdk.client.model.ReplyBody;
+import org.slf4j.LoggerFactory
+import vip.qsos.im.lib.client.model.Message
+import vip.qsos.im.lib.client.model.ReplyBody
+import java.util.*
 
 /**
  * CIM 消息监听器管理
  */
-public class CIMListenerManager {
+object IMListenerManager {
+    private val cimListeners = ArrayList<IMEventListener>()
+    private val comparator = CIMMessageReceiveComparator()
+    private val LOGGER = LoggerFactory.getLogger(IMListenerManager::class.java)
 
-	private static ArrayList<CIMEventListener> cimListeners = new ArrayList<CIMEventListener>();
-	private static CIMMessageReceiveComparator comparator = new CIMMessageReceiveComparator();
-    private static final Logger LOGGER = LoggerFactory.getLogger(CIMListenerManager.class);
+    fun registerMessageListener(listener: IMEventListener) {
+        if (!cimListeners.contains(listener)) {
+            cimListeners.add(listener)
+            Collections.sort(cimListeners, comparator)
+        }
+    }
 
-	public static void registerMessageListener(CIMEventListener listener) {
+    fun removeMessageListener(listener: IMEventListener) {
+        for (i in cimListeners.indices) {
+            if (listener.javaClass == cimListeners[i].javaClass) {
+                cimListeners.removeAt(i)
+            }
+        }
+    }
 
-		if (!cimListeners.contains(listener)) {
-			cimListeners.add(listener);
-			Collections.sort(cimListeners, comparator);
-		}
-	}
+    fun notifyOnConnectionSuccess(autoBind: Boolean) {
+        for (listener in cimListeners) {
+            listener.onConnectionSuccess(autoBind)
+        }
+    }
 
-	public static void removeMessageListener(CIMEventListener listener) {
-		for (int i = 0; i < cimListeners.size(); i++) {
-			if (listener.getClass() == cimListeners.get(i).getClass()) {
-				cimListeners.remove(i);
-			}
-		}
-	}
+    fun notifyOnMessageReceived(message: Message) {
+        for (listener in cimListeners) {
+            listener.onMessageReceived(message)
+        }
+    }
 
-	public static void notifyOnConnectionSuccessed(boolean antoBind) {
-		for (CIMEventListener listener : cimListeners) {
-			listener.onConnectionSuccessed(antoBind);
-		}
-	}
+    fun notifyOnConnectionClose() {
+        for (listener in cimListeners) {
+            listener.onConnectionClosed()
+        }
+    }
 
-	public static void notifyOnMessageReceived(Message message) {
-		for (CIMEventListener listener : cimListeners) {
-			listener.onMessageReceived(message);
-		}
-	}
+    fun notifyOnReplyReceived(body: ReplyBody) {
+        for (listener in cimListeners) {
+            listener.onReplyReceived(body)
+        }
+    }
 
-	public static void notifyOnConnectionClosed() {
-		for (CIMEventListener listener : cimListeners) {
-			listener.onConnectionClosed();
-		}
-	}
+    fun notifyOnConnectionFailed() {
+        for (listener in cimListeners) {
+            listener.onConnectionFailed()
+        }
+    }
 
-	public static void notifyOnReplyReceived(ReplyBody body) {
-		for (CIMEventListener listener : cimListeners) {
-			listener.onReplyReceived(body);
-		}
-	}
+    fun destroy() {
+        cimListeners.clear()
+    }
 
-	public static void notifyOnConnectionFailed() {
-		for (CIMEventListener listener : cimListeners) {
-			listener.onConnectionFailed();
-		}
-	}
+    fun logListenersName() {
+        for (listener in cimListeners) {
+            LOGGER.debug("#######" + listener.javaClass.name + "#######")
+        }
+    }
 
-	public static void destory() {
-		cimListeners.clear();
-	}
-
-	public static void logListenersName() {
-		for (CIMEventListener listener : cimListeners) {
-			LOGGER.debug("#######" + listener.getClass().getName() + "#######");
-		}
-	}
-
-	/**
-	 * 消息接收activity的接收顺序排序，CIM_RECEIVE_ORDER倒序
-	 */
-	private static class CIMMessageReceiveComparator implements Comparator<CIMEventListener> {
-
-		@Override
-		public int compare(CIMEventListener arg1, CIMEventListener arg2) {
-
-			int order1 = arg1.getEventDispatchOrder();
-			int order2 = arg2.getEventDispatchOrder();
-			return order2 - order1;
-		}
-
-	}
-
+    /**消息接收顺序排序，eventDispatchOrder 倒序*/
+    private class CIMMessageReceiveComparator :
+        Comparator<IMEventListener> {
+        override fun compare(
+            arg1: IMEventListener,
+            arg2: IMEventListener
+        ): Int {
+            val order1 = arg1.eventDispatchOrder
+            val order2 = arg2.eventDispatchOrder
+            return order2 - order1
+        }
+    }
 }
