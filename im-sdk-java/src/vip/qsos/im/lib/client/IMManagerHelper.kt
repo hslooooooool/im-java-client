@@ -158,25 +158,25 @@ object IMManagerHelper {
     /**账号登录*/
     private fun sendBindRequest(account: String) {
         IMCacheManager.instance.putBoolean(IMCacheManager.KEY_MANUAL_STOP, false)
-        val sent = SendBody()
+        val sendBody = SendBody()
         val sysPro = System.getProperties()
-        sent.key = IMConstant.RequestKey.CLIENT_BIND
-        sent.put("account", account)
-        sent.put("deviceId", deviceId)
-        sent.put("channel", "java")
-        sent.put("device", sysPro.getProperty("os.name"))
-        sent.put("version", clientVersion)
-        sent.put("osVersion", sysPro.getProperty("os.version"))
-        sendRequest(sent)
+        sendBody.key = IMConstant.RequestKey.CLIENT_BIND
+        sendBody.put("account", account)
+        sendBody.put("deviceId", deviceId)
+        sendBody.put("channel", "java")
+        sendBody.put("device", sysPro.getProperty("os.name"))
+        sendBody.put("version", clientVersion)
+        sendBody.put("osVersion", sysPro.getProperty("os.version"))
+        sendRequest(sendBody)
     }
 
     /**生成设备唯一ID*/
     private val deviceId: String
         get() {
-            var deviceId = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_DEVICEID)
+            var deviceId = System.getProperties().getProperty(IMConstant.ConfigKey.CLIENT_DEVICE_ID)
             if (deviceId == null) {
                 deviceId = UUID.randomUUID().toString().replace("-".toRegex(), "").toUpperCase()
-                System.getProperties()[IMConstant.ConfigKey.CLIENT_DEVICEID] = deviceId
+                System.getProperties()[IMConstant.ConfigKey.CLIENT_DEVICE_ID] = deviceId
             }
             return deviceId
         }

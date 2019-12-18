@@ -29,7 +29,7 @@ interface IMConstant {
             const val DEVICE_MODEL = "client.model"
             const val CLIENT_VERSION = "client.version"
             const val CLIENT_ACCOUNT = "client.account"
-            const val CLIENT_DEVICEID = "client.deviceid"
+            const val CLIENT_DEVICE_ID = "client.deviceId"
         }
     }
 

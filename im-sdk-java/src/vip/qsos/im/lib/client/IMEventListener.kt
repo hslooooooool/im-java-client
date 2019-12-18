@@ -11,7 +11,7 @@ import vip.qsos.im.lib.client.model.SendBody
 interface IMEventListener {
 
     /**监听器在容器里面的排序。值越大则越先接收*/
-    val eventDispatchOrder: Int
+    var eventDispatchOrder: Int
 
     /**
      * 监听服务端推送过来的消息时调用
@@ -32,7 +32,7 @@ interface IMEventListener {
      *
      * @param sendBody 客户端消息发送实体
      */
-    fun onSentSuccess(sendBody: SendBody)
+    fun onSendSuccess(sendBody: SendBody)
 
     /**
      * 监听服务器连接成功时回调
