@@ -19,7 +19,7 @@ fun main(a: Array<String>) {
     /**设置全局的事件监听器*/
     IMEventBroadcastReceiver.instance.setIMEventListener(MyClientListener())
     /**连接到服务器*/
-    IMManagerHelper.connect("127.0.0.1", 23456)
+    IMManagerHelper.connect("192.168.3.131", 23456)
 
     val sc = Scanner(System.`in`)
     println("请输入: ")
