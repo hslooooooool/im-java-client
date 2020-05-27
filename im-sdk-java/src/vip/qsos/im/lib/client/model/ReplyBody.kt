@@ -51,6 +51,7 @@ class ReplyBody : Serializable {
         buffer.append("\n#ReplyBody#")
         buffer.append("\nkey:$key")
         buffer.append("\ntimestamp:$timestamp")
+        buffer.append("\nmessage:$message")
         buffer.append("\ncode:$code")
         if (!data.isEmpty) {
             buffer.append("\ndata{")
