@@ -35,6 +35,7 @@ class IMConnectorManager : IConnectManager {
 
         const val READ_BUFFER_SIZE = 2048
         const val WRITE_BUFFER_SIZE = 1024
+
         /**连接服务器的超时时长，毫秒*/
         const val CONNECT_TIME_OUT = 10 * 1000
     }
@@ -162,6 +163,7 @@ class IMConnectorManager : IConnectManager {
                     result += this.mSocketChannel!!.write(buffer)
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 IMLogger.LOGGER.sendException(e)
                 result = -1
             } finally {

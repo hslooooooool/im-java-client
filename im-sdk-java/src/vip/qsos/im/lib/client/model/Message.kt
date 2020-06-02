@@ -15,20 +15,28 @@ class Message : IProtobufAble {
 
     /**消息ID*/
     var id: Long = 0
+
     /**消息类型，自定义消息类型*/
     var action: String? = null
+
     /**消息标题*/
     var title: String? = null
+
     /**消息类容，content 根据 format 数据格式进行解析*/
     var content: String? = null
+
     /**消息发送者账号*/
     var sender: String? = null
+
     /**消息发送者接收者*/
     var receiver: String? = null
+
     /**content 内容格式，如 text,json,xml数据格式*/
     var format: String? = null
+
     /**附加内容*/
     var extra: String? = null
+
     /**消息发送时间*/
     var timestamp: Long = 0
 
@@ -47,7 +55,7 @@ class Message : IProtobufAble {
             builder.content = content
             builder.sender = sender
             builder.receiver = receiver
-            builder.format = format
+            builder.format = format ?: "JSON"
             extra?.let { builder.extra = extra }
             builder.timestamp = timestamp
             return builder.build().toByteArray()

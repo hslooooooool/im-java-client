@@ -15,7 +15,7 @@ import java.util.*
 fun main(a: Array<String>) {
     /**设置运行时参数*/
     IMManagerHelper.clientVersion = "1.0.0"
-    IMManagerHelper.account = "000000001"
+    IMManagerHelper.account = "000000002"
     /**设置全局的事件监听器*/
     IMEventBroadcastReceiver.instance.setIMEventListener(MyClientListener())
     /**连接到服务器*/
@@ -24,13 +24,19 @@ fun main(a: Array<String>) {
     val sc = Scanner(System.`in`)
     println("请输入: ")
     while (sc.hasNext()) {
-        val message = "content=${sc.next()}&action=2&sender=JAVA客户端&receiver=9999&format=0"
-        //doPost("http://localhost:8085/api/message/send", message)
+        val msg = sc.next()
         val send = SendBody()
         send.key = "custom"
         send.timestamp = System.currentTimeMillis()
-        send.put("data", "测试数据")
+        send.put("content", "测试指令$msg")
         IMManagerHelper.sendRequest(send)
+        val message = Message()
+        message.sender = IMManagerHelper.account
+        message.action = "message"
+        message.content = "测试自定义消息$msg"
+        message.receiver = "000000001"
+        message.title = "自定义消息"
+        IMManagerHelper.sendMessage(message)
     }
 }
 
