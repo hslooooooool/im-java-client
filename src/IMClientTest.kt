@@ -59,7 +59,7 @@ class MyClientListener : IMEventListener {
     override fun onConnectionSuccess(hasAutoBind: Boolean) {
         println("onConnectionSuccess")
         if (!hasAutoBind) {
-            IMManagerHelper.bindAccount("000000001")
+            IMManagerHelper.bindAccount("000000002")
         }
     }
 
