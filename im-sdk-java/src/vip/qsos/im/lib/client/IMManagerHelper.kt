@@ -11,18 +11,27 @@ import java.util.*
  * 消息服务管理帮助类
  */
 object IMManagerHelper {
-    /**【动作】发送消息到服务器*/
+    /**【动作】发送指令到服务器*/
     const val ACTION_SEND_REQUEST_BODY = "ACTION_SEND_REQUEST_BODY"
+
+    /**【动作】发送消息到服务器*/
+    const val ACTION_SEND_REQUEST_MESSAGE = "ACTION_SEND_REQUEST_MESSAGE"
+
     /**【动作】关闭服务器连接*/
     const val ACTION_CLOSE_CONNECTION = "ACTION_CLOSE_CONNECTION"
+
     /**【动作】销毁服务器连接*/
     const val ACTION_DESTROY_CONNECTION = "ACTION_DESTROY_CONNECTION"
+
     /**【动作】连接消息服务器*/
     const val ACTION_CREATE_CONNECTION = "ACTION_CREATE_CONNECTION"
+
     /**【动作】消息服务器活跃检测，死掉将重连*/
     const val ACTION_ACTIVATE_PUSH_SERVICE = "ACTION_ACTIVATE_PUSH_SERVICE"
+
     /**发送的消息数据*/
     const val KEY_SEND_BODY = "KEY_SEND_BODY"
+
     /**连接状态*/
     const val KEY_CONNECTION_STATUS = "KEY_CONNECTION_STATUS"
 
@@ -82,7 +91,7 @@ object IMManagerHelper {
         return true
     }
 
-    /**发送消息*/
+    /**发送指令*/
     fun sendRequest(body: SendBody?) {
         val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
         val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
@@ -92,6 +101,22 @@ object IMManagerHelper {
         val serviceIntent = Intent()
         serviceIntent.putExtra(SendBody::class.java.name, body)
         serviceIntent.action = ACTION_SEND_REQUEST_BODY
+        postEvent(serviceIntent)
+    }
+
+    /**发送消息*/
+    fun sendMessage(message: Message) {
+        message.sender = account
+        message.format = "JSON"
+        message.action = "SINGLE"
+        val manualStop: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_MANUAL_STOP)
+        val manualDestroy: Boolean = IMCacheManager.instance.getBoolean(IMCacheManager.KEY_IM_DESTROY)
+        if (manualStop || manualDestroy) {
+            return
+        }
+        val serviceIntent = Intent()
+        serviceIntent.putExtra(Message::class.java.name, message)
+        serviceIntent.action = ACTION_SEND_REQUEST_MESSAGE
         postEvent(serviceIntent)
     }
 
@@ -168,17 +193,6 @@ object IMManagerHelper {
         sendBody.put("version", clientVersion)
         sendBody.put("osVersion", version)
         sendRequest(sendBody)
-    }
-
-    /**创建一个本客户端发送消息实体*/
-    fun createMessageOfMe(content: String, receiver: String): Message {
-        val message = Message()
-        message.action = "2"
-        message.content = content
-        message.sender = account
-        message.receiver = receiver
-        message.format = "0"
-        return message
     }
 
     /**获取设备版本*/

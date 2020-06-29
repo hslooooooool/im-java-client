@@ -19,18 +19,25 @@ fun main(a: Array<String>) {
     /**设置全局的事件监听器*/
     IMEventBroadcastReceiver.instance.setIMEventListener(MyClientListener())
     /**连接到服务器*/
-    IMManagerHelper.connect("192.168.3.131", 23456)
+    IMManagerHelper.connect("192.168.3.2", 23456)
 
     val sc = Scanner(System.`in`)
     println("请输入: ")
     while (sc.hasNext()) {
-        val message = "content=${sc.next()}&action=2&sender=JAVA客户端&receiver=9999&format=0"
-        //doPost("http://localhost:8085/api/message/send", message)
+        val msg = sc.next()
+        //val msg = "content=${sc.next()}&action=2&sender=JAVA客户端&receiver=9999&format=0"
+        //doPost("http://localhost:8085/api/message/send", msg)
         val send = SendBody()
         send.key = "custom"
         send.timestamp = System.currentTimeMillis()
-        send.put("data", "测试数据")
+        send.put("data", msg)
         IMManagerHelper.sendRequest(send)
+
+        val message = Message()
+        message.content = msg
+        message.receiver = "000000002"
+        IMManagerHelper.sendMessage(message)
+
     }
 }
 

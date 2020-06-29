@@ -1,6 +1,7 @@
 package vip.qsos.im.lib.client
 
 import vip.qsos.im.lib.client.model.Intent
+import vip.qsos.im.lib.client.model.Message
 import vip.qsos.im.lib.client.model.SendBody
 
 /**
@@ -33,6 +34,9 @@ class IMPushService {
             }
             IMManagerHelper.ACTION_SEND_REQUEST_BODY -> {
                 IMConnectorManager.instance!!.send(mIntent.getExtra(SendBody::class.java.name) as SendBody)
+            }
+            IMManagerHelper.ACTION_SEND_REQUEST_MESSAGE -> {
+                IMConnectorManager.instance!!.send(mIntent.getExtra(Message::class.java.name) as Message)
             }
             IMManagerHelper.ACTION_CLOSE_CONNECTION -> {
                 IMConnectorManager.instance!!.closeConnect()
