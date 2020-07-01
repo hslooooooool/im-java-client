@@ -33,7 +33,7 @@ fun main(a: Array<String>) {
         IMManagerHelper.sendRequest(send)
         val message = Message()
         message.sender = IMManagerHelper.account
-        message.action = "message"
+        message.action = "SINGLE"
         message.content = "测试自定义消息$msg"
         message.receiver = "000000002"
         message.title = "自定义消息"
