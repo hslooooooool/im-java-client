@@ -2,6 +2,7 @@ import sun.net.www.protocol.http.Handler
 import vip.qsos.im.lib.client.IMEventBroadcastReceiver
 import vip.qsos.im.lib.client.IMEventListener
 import vip.qsos.im.lib.client.IMManagerHelper
+import vip.qsos.im.lib.client.constant.IMConstant
 import vip.qsos.im.lib.client.model.Message
 import vip.qsos.im.lib.client.model.ReplyBody
 import vip.qsos.im.lib.client.model.SendBody
@@ -15,7 +16,7 @@ import java.util.*
 fun main(a: Array<String>) {
     /**设置运行时参数*/
     IMManagerHelper.clientVersion = "1.0.0"
-    IMManagerHelper.account = "000000002"
+    IMManagerHelper.account = "000000001"
     /**设置全局的事件监听器*/
     IMEventBroadcastReceiver.instance.setIMEventListener(MyClientListener())
     /**连接到服务器*/
@@ -34,7 +35,7 @@ fun main(a: Array<String>) {
         message.sender = IMManagerHelper.account
         message.action = "message"
         message.content = "测试自定义消息$msg"
-        message.receiver = "000000001"
+        message.receiver = "000000002"
         message.title = "自定义消息"
         IMManagerHelper.sendMessage(message)
     }
@@ -59,7 +60,7 @@ class MyClientListener : IMEventListener {
     override fun onConnectionSuccess(hasAutoBind: Boolean) {
         println("onConnectionSuccess")
         if (!hasAutoBind) {
-            IMManagerHelper.bindAccount("000000002")
+            IMManagerHelper.bindAccount("000000001")
         }
     }
 
@@ -69,6 +70,9 @@ class MyClientListener : IMEventListener {
 
     override fun onReplyReceived(replyBody: ReplyBody) {
         println(replyBody.toString())
+        if (replyBody.key == IMConstant.RequestKey.CLIENT_CLOSE || replyBody.code == "401") {
+            IMManagerHelper.stop()
+        }
     }
 
     override fun onSendSuccess(sendBody: SendBody) {
